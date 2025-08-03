@@ -10,10 +10,12 @@ import { usePromptStore } from '@/lib/stores/promptStore';
 export default function Home() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [topic, setTopic] = useState<string>('');
   const { openSettings, isSettingsOpen } = usePromptStore();
 
-  const handleQuestionsGenerated = (newQuestions: Question[]) => {
+  const handleQuestionsGenerated = (newQuestions: Question[], generatedTopic: string) => {
     setQuestions(newQuestions);
+    setTopic(generatedTopic);
   };
 
   return (
@@ -82,7 +84,7 @@ export default function Home() {
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
                 生成された想定質問 ({questions.length}件)
               </h2>
-              <QuestionsTable questions={questions} />
+              <QuestionsTable questions={questions} topic={topic} />
             </section>
           )}
         </div>

@@ -2,12 +2,16 @@
 
 import { Question } from '@/lib/schemas';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface QuestionsTableProps {
   questions: Question[];
+  topic?: string; // シミュレーション用のテーマ
 }
 
-export default function QuestionsTable({ questions }: QuestionsTableProps) {
+export default function QuestionsTable({ questions, topic }: QuestionsTableProps) {
+  const router = useRouter();
+
   const getDifficultyColor = (difficulty: number) => {
     if (difficulty <= 2) return 'bg-green-100 text-green-800';
     if (difficulty <= 3) return 'bg-yellow-100 text-yellow-800';
@@ -18,6 +22,12 @@ export default function QuestionsTable({ questions }: QuestionsTableProps) {
     if (gotcha === 0) return 'bg-gray-100 text-gray-800';
     if (gotcha <= 1) return 'bg-yellow-100 text-yellow-800';
     return 'bg-red-100 text-red-800';
+  };
+
+  const handleSimulationStart = () => {
+    if (topic) {
+      router.push(`/simulate?topic=${encodeURIComponent(topic)}`);
+    }
   };
 
   return (
@@ -44,7 +54,7 @@ export default function QuestionsTable({ questions }: QuestionsTableProps) {
               リスク領域
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              シミュレーション
+              アクション
             </th>
           </tr>
         </thead>
@@ -82,12 +92,16 @@ export default function QuestionsTable({ questions }: QuestionsTableProps) {
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <Link
-                  href={`/simulate/${question.id}`}
-                  className="text-blue-600 hover:text-blue-900 hover:underline"
-                >
-                  練習開始
-                </Link>
+                {index === 0 && topic ? (
+                  <button
+                    onClick={handleSimulationStart}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                  >
+                    シミュレーション開始
+                  </button>
+                ) : (
+                  <span className="text-gray-400 text-sm">-</span>
+                )}
               </td>
             </tr>
           ))}

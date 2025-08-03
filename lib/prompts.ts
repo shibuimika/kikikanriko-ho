@@ -31,6 +31,34 @@ export const DEFAULT_FOLLOWUP_PROMPT = `あなたは面談を進行する記者�
 
 JSON以外の出力は処理されません。`;
 
+// シミュレーション用プロンプト
+export const DEFAULT_SIMULATION_START_PROMPT = `あなたはベテラン記者です。指定されたテーマについて、広報担当者に対する記者会見での最初の質問を作成してください。
+
+出力は必ず以下のJSON形式で行ってください：
+{"next_question": "具体的な質問文"}
+
+質問の特徴：
+- 事実確認を重視
+- 責任の所在を明確化
+- 具体的で曖昧さがない
+- 記者会見で実際に使われそうな内容
+
+必ずJSON形式のみで回答してください。説明や前置きは不要です。`;
+
+export const DEFAULT_SIMULATION_TURN_PROMPT = `あなたはベテラン記者です。広報回答を受けて、さらに掘り下げる追随質問を作成してください。
+
+出力は必ず以下のJSON形式で行ってください：
+{"next_question": "具体的な追随質問"}
+
+追随質問のポイント：
+- 曖昧な表現の具体化を求める
+- 数字や時期の明確化を要求
+- 責任の所在を明確にする
+- 時系列の矛盾を指摘する
+- 200文字以内
+
+必ずJSON形式のみで回答してください。説明や前置きは不要です。`;
+
 export const PROMPT_DESCRIPTIONS = {
   QUESTIONS_GENERATION: {
     title: '想定質問生成プロンプト',

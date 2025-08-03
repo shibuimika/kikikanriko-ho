@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Question } from '@/lib/schemas';
 import { useCustomPrompts } from '@/lib/stores/promptStore';
 
 interface PromptFormProps {
-  onQuestionsGenerated: (questions: Question[]) => void;
+  onQuestionsGenerated: (questions: Question[], topic: string) => void;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
 }
@@ -14,7 +14,13 @@ export default function PromptForm({ onQuestionsGenerated, isLoading, setIsLoadi
   const [topic, setTopic] = useState('');
   const [context, setContext] = useState('');
   const [error, setError] = useState('');
+  const [isHydrated, setIsHydrated] = useState(false);
   const { getQuestionPrompt, isUsingCustomQuestionPrompt } = useCustomPrompts();
+
+  // ハイドレーション完了後にクライアントサイドの状態を表示
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +44,7 @@ export default function PromptForm({ onQuestionsGenerated, isLoading, setIsLoadi
         body: JSON.stringify({
           topic: topic.trim(),
           context: context.trim() || undefined,
-          customPrompt: isUsingCustomQuestionPrompt() ? currentPrompt : undefined,
+          customPrompt: (isHydrated && isUsingCustomQuestionPrompt()) ? currentPrompt : undefined,
         }),
       });
 
@@ -48,7 +54,7 @@ export default function PromptForm({ onQuestionsGenerated, isLoading, setIsLoadi
       }
 
       const data = await response.json();
-      onQuestionsGenerated(data.questions);
+      onQuestionsGenerated(data.questions, topic.trim());
     } catch (error) {
       console.error('Error generating questions:', error);
       setError(error instanceof Error ? error.message : 'アプリで予期しないエラーが発生しました');
@@ -60,7 +66,7 @@ export default function PromptForm({ onQuestionsGenerated, isLoading, setIsLoadi
   return (
     <div className="space-y-4">
       {/* Prompt Status Indicator */}
-      {isUsingCustomQuestionPrompt() && (
+      {isHydrated && isUsingCustomQuestionPrompt() && (
         <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
           <div className="flex items-center">
             <svg className="w-4 h-4 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,7 +90,7 @@ export default function PromptForm({ onQuestionsGenerated, isLoading, setIsLoadi
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="例: データ流出事件、SNS炎上、製品リコール など"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-400 disabled:bg-gray-50 disabled:text-gray-500"
           rows={3}
           maxLength={1000}
           disabled={isLoading}
@@ -104,7 +110,7 @@ export default function PromptForm({ onQuestionsGenerated, isLoading, setIsLoadi
           value={context}
           onChange={(e) => setContext(e.target.value)}
           placeholder="関連するURL、背景情報、既存報道など（任意）"
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-400 disabled:bg-gray-50 disabled:text-gray-500"
           rows={2}
           maxLength={500}
           disabled={isLoading}

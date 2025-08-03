@@ -36,6 +36,23 @@ export const FollowUpSchema = {
   required: ["follow_up_question","rationale_tags"]
 } as const;
 
+// シミュレーション用のSchemas
+export const SimulationStartSchema = {
+  type: "object",
+  properties: {
+    next_question: { type: "string", minLength: 5, maxLength: 200 }
+  },
+  required: ["next_question"]
+} as const;
+
+export const SimulationTurnSchema = {
+  type: "object",
+  properties: {
+    next_question: { type: "string", minLength: 5, maxLength: 200 }
+  },
+  required: ["next_question"]
+} as const;
+
 // TypeScript types based on schemas
 export interface Question {
   id: string;
@@ -54,4 +71,13 @@ export interface QuestionsResponse {
 export interface FollowUpResponse {
   follow_up_question: string;
   rationale_tags: string[];
+}
+
+// シミュレーション用の型定義
+export interface SimulationStartResponse {
+  next_question: string;
+}
+
+export interface SimulationTurnResponse {
+  next_question: string;
 }

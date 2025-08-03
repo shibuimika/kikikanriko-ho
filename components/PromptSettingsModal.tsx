@@ -187,7 +187,7 @@ export default function PromptSettingsModal() {
               <textarea
                 value={getCurrentEditingPrompt()}
                 onChange={(e) => setCurrentEditingPrompt(e.target.value)}
-                className="w-full h-96 p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                className="w-full h-96 p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm text-gray-900 placeholder-gray-400"
                 placeholder={`${PROMPT_DESCRIPTIONS[activeTab].title}を入力してください...`}
               />
               <p className="mt-1 text-xs text-gray-500">

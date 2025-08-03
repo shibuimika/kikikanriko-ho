@@ -100,30 +100,63 @@ export function extractJSON(text: string): string {
   cleaned = cleaned.replace(/<[^>]*>/g, '');
   
   // Remove markdown code blocks
+  cleaned = cleaned.replace(/```json\s*/gi, '');
   cleaned = cleaned.replace(/```[\s\S]*?```/g, '');
   cleaned = cleaned.replace(/```[^`]*```/g, '');
+  cleaned = cleaned.replace(/```/g, '');
   
-  // Remove leading text before the first {
-  const firstBrace = cleaned.indexOf('{');
-  if (firstBrace > 0) {
-    cleaned = cleaned.substring(firstBrace);
+  // Remove common prefixes
+  cleaned = cleaned.replace(/^(?:出力：?|回答：?|レスポンス：?|応答：?|結果：?|JSON：?)\s*/gi, '');
+  
+  // Find JSON object boundaries more precisely
+  let startIndex = -1;
+  let endIndex = -1;
+  let braceCount = 0;
+  
+  for (let i = 0; i < cleaned.length; i++) {
+    if (cleaned[i] === '{') {
+      if (startIndex === -1) startIndex = i;
+      braceCount++;
+    } else if (cleaned[i] === '}') {
+      braceCount--;
+      if (braceCount === 0 && startIndex !== -1) {
+        endIndex = i;
+        break;
+      }
+    }
   }
   
-  // Remove trailing text after the last }
-  const lastBrace = cleaned.lastIndexOf('}');
-  if (lastBrace >= 0 && lastBrace < cleaned.length - 1) {
-    cleaned = cleaned.substring(0, lastBrace + 1);
+  if (startIndex !== -1 && endIndex !== -1) {
+    cleaned = cleaned.substring(startIndex, endIndex + 1);
+  } else {
+    // Fallback to original logic
+    const firstBrace = cleaned.indexOf('{');
+    if (firstBrace > 0) {
+      cleaned = cleaned.substring(firstBrace);
+    }
+    
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (lastBrace >= 0 && lastBrace < cleaned.length - 1) {
+      cleaned = cleaned.substring(0, lastBrace + 1);
+    }
   }
   
   return cleaned.trim();
 }
 
 // Legacy prompts (will be replaced by prompts.ts)
-import { DEFAULT_QUESTIONS_PROMPT, DEFAULT_FOLLOWUP_PROMPT } from './prompts';
+import { 
+  DEFAULT_QUESTIONS_PROMPT, 
+  DEFAULT_FOLLOWUP_PROMPT,
+  DEFAULT_SIMULATION_START_PROMPT,
+  DEFAULT_SIMULATION_TURN_PROMPT
+} from './prompts';
 
 export const SYSTEM_PROMPTS = {
   QUESTIONS_GENERATION: DEFAULT_QUESTIONS_PROMPT,
-  FOLLOWUP_GENERATION: DEFAULT_FOLLOWUP_PROMPT
+  FOLLOWUP_GENERATION: DEFAULT_FOLLOWUP_PROMPT,
+  SIMULATION_START: DEFAULT_SIMULATION_START_PROMPT,
+  SIMULATION_TURN: DEFAULT_SIMULATION_TURN_PROMPT
 };
 
 export function createQuestionsPrompt(topic: string, context?: string): string {
@@ -142,4 +175,17 @@ export function createFollowUpPrompt(
   return `【直前の質問】: ${prevQuestion}
 【広報回答】: ${answer}
 【論点メモ（任意）】: ${threadNotes || 'なし'}`;
+}
+
+// シミュレーション用プロンプト作成関数
+export function createSimulationStartPrompt(topic: string): string {
+  return `【テーマ】: ${topic}`;
+}
+
+export function createSimulationTurnPrompt(
+  lastQuestion: string,
+  userAnswer: string
+): string {
+  return `【前の質問】: ${lastQuestion}
+【広報回答】: ${userAnswer}`;
 }
