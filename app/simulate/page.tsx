@@ -3,14 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useChatStore, useChatActions, useChatData } from '@/lib/stores/chatStore';
+import RiskAnalysis from '@/components/RiskAnalysis';
 
 export default function SimulatePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const topic = searchParams.get('topic');
   
-  const { topic: currentTopic, messages, isLoading, hasMessages } = useChatData();
-  const { initializeChat, addMessage, setLoading, getLastReporterQuestion } = useChatActions();
+  const { topic: currentTopic, messages, isLoading, hasMessages, risks, isAnalyzingRisk } = useChatData();
+  const { initializeChat, addMessage, setLoading, getLastReporterQuestion, setRisks, setAnalyzingRisk } = useChatActions();
   
   const [userInput, setUserInput] = useState('');
   const [error, setError] = useState('');
@@ -42,17 +43,68 @@ export default function SimulatePage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'サーバーエラーが発生しました');
+        let errorMessage = 'サーバーエラーが発生しました';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      
+      if (!data.next_question || data.next_question.trim().length === 0) {
+        throw new Error('有効な質問が生成されませんでした。もう一度お試しください。');
+      }
+      
       addMessage('reporter', data.next_question);
     } catch (error) {
       console.error('Error starting simulation:', error);
-      setError(error instanceof Error ? error.message : 'シミュレーション開始に失敗しました');
+      const errorMessage = error instanceof Error ? error.message : 'シミュレーション開始に失敗しました';
+      setError(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // リスク分析の実行
+  const analyzeRisk = async (question: string, userAnswer: string) => {
+    setAnalyzingRisk(true);
+    try {
+      const response = await fetch('/api/risk-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question,
+          userAnswer,
+        }),
+      });
+
+      if (!response.ok) {
+        try {
+          const errorData = await response.json();
+          console.error('Risk analysis failed:', errorData.error);
+        } catch (parseError) {
+          console.error('Risk analysis failed with non-JSON response:', response.status);
+        }
+        return; // エラーでもシミュレーションは継続
+      }
+
+      const data = await response.json();
+      if (data.risks && Array.isArray(data.risks)) {
+        setRisks(data.risks);
+      } else {
+        console.error('Invalid risk analysis response format:', data);
+      }
+    } catch (error) {
+      console.error('Error analyzing risk:', error);
+      // エラーでもシミュレーションは継続
+    } finally {
+      setAnalyzingRisk(false);
     }
   };
 
@@ -78,24 +130,27 @@ export default function SimulatePage() {
       const currentInput = userInput.trim();
       setUserInput('');
 
-      // 次の質問を取得
-      const response = await fetch('/api/simulate/turn', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          lastQuestion,
-          userAnswer: currentInput,
+      // 並行してリスク分析と次の質問取得を実行
+      const [nextQuestionResponse] = await Promise.all([
+        fetch('/api/simulate/turn', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            lastQuestion,
+            userAnswer: currentInput,
+          }),
         }),
-      });
+        analyzeRisk(lastQuestion, currentInput), // リスク分析を並行実行
+      ]);
 
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (!nextQuestionResponse.ok) {
+        const errorData = await nextQuestionResponse.json();
         throw new Error(errorData.error || 'サーバーエラーが発生しました');
       }
 
-      const data = await response.json();
+      const data = await nextQuestionResponse.json();
       addMessage('reporter', data.next_question);
     } catch (error) {
       console.error('Error sending answer:', error);
@@ -136,8 +191,10 @@ export default function SimulatePage() {
       </header>
 
       {/* Chat Messages */}
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-white rounded-lg shadow h-full flex flex-col">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+          {/* Chat Area */}
+          <div className="lg:col-span-2 bg-white rounded-lg shadow h-full flex flex-col">
           {/* Messages Area */}
           <div className="flex-1 p-6 space-y-4 overflow-y-auto">
             {hasMessages ? (
@@ -227,6 +284,12 @@ export default function SimulatePage() {
             <div className="text-xs text-gray-500 mt-2">
               Shift+Enterで改行、Enterで送信
             </div>
+          </div>
+          </div>
+
+          {/* Risk Analysis Area */}
+          <div className="lg:col-span-1">
+            <RiskAnalysis risks={risks} isAnalyzing={isAnalyzingRisk} />
           </div>
         </div>
       </main>

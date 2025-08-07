@@ -31,33 +31,58 @@ export const DEFAULT_FOLLOWUP_PROMPT = `あなたは面談を進行する記者�
 
 JSON以外の出力は処理されません。`;
 
-// シミュレーション用プロンプト
-export const DEFAULT_SIMULATION_START_PROMPT = `あなたはベテラン記者です。指定されたテーマについて、広報担当者に対する記者会見での最初の質問を作成してください。
+export const SIMULATION_START_PROMPT = `あなたは記者会見で鋭い質問を投げかける記者です。指定されたテーマに関して、最初の質問を1つだけ生成してください。
 
-出力は必ず以下のJSON形式で行ってください：
-{"next_question": "具体的な質問文"}
+**重要な制約:**
+- 出力は有効なJSONのみ。説明文、思考プロセス、タグは一切禁止。
+- <think>タグや他のタグは絶対に使用しないでください。
+- 最初の文字から最後の文字まで、すべて有効なJSONである必要があります。
 
-質問の特徴：
-- 事実確認を重視
-- 責任の所在を明確化
-- 具体的で曖昧さがない
-- 記者会見で実際に使われそうな内容
+**出力形式例:**
+{"next_question": "具体的な最初の質問"}
 
-必ずJSON形式のみで回答してください。説明や前置きは不要です。`;
+質問は以下の観点から作成してください:
+- 事実確認から始める
+- 核心に迫る内容
+- 200字以内で簡潔に
 
-export const DEFAULT_SIMULATION_TURN_PROMPT = `あなたはベテラン記者です。広報回答を受けて、さらに掘り下げる追随質問を作成してください。
+JSON以外の出力は処理されません。`;
 
-出力は必ず以下のJSON形式で行ってください：
+export const SIMULATION_TURN_PROMPT = `あなたは記者会見で鋭い質問を投げかける記者です。前回の質問と広報担当者の回答を受けて、追随質問を1つだけ生成してください。
+
+**重要な制約:**
+- 出力は有効なJSONのみ。説明文、思考プロセス、タグは一切禁止。
+- <think>タグや他のタグは絶対に使用しないでください。
+- 最初の文字から最後の文字まで、すべて有効なJSONである必要があります。
+
+**出力形式例:**
 {"next_question": "具体的な追随質問"}
 
-追随質問のポイント：
-- 曖昧な表現の具体化を求める
-- 数字や時期の明確化を要求
+追随質問は以下の観点から作成してください:
+- 曖昧な表現（適切に、速やかに等）を具体化させる
+- 数字や時期を具体的に問う
 - 責任の所在を明確にする
-- 時系列の矛盾を指摘する
-- 200文字以内
+- 被害者への配慮を確認する
+- 200字以内で簡潔に
 
-必ずJSON形式のみで回答してください。説明や前置きは不要です。`;
+JSON以外の出力は処理されません。`;
+
+export const RISK_SYSTEM_PROMPT = `あなたは危機管理専門家です。以下の質問と広報回答から想定リスクを網羅的に列挙し、JSONのみを返してください。
+
+**重要な制約:**
+- 出力は有効なJSONのみ。説明文、思考プロセス、タグは一切禁止。
+- <think>タグや他のタグは絶対に使用しないでください。
+- 最初の文字から最後の文字まで、すべて有効なJSONである必要があります。
+
+**出力形式例:**
+{"risks": [{"id": "r1", "description": "具体的なリスクの説明", "severity": "high"}]}
+
+severity は high / medium / low の三段階で評価してください:
+- high: 組織の存続、法的責任、人命に関わる重大なリスク
+- medium: 評判損失、経済的損失が予想されるリスク  
+- low: 軽微な影響に留まるリスク
+
+JSON以外の出力は処理されません。`;
 
 export const PROMPT_DESCRIPTIONS = {
   QUESTIONS_GENERATION: {
@@ -69,6 +94,21 @@ export const PROMPT_DESCRIPTIONS = {
     title: '追随質問生成プロンプト', 
     description: '広報回答に対する追随質問を生成するためのシステムプロンプトです。',
     defaultValue: DEFAULT_FOLLOWUP_PROMPT
+  },
+  SIMULATION_START: {
+    title: 'シミュレーション開始プロンプト',
+    description: 'シミュレーション開始時の最初の質問を生成するためのシステムプロンプトです。',
+    defaultValue: SIMULATION_START_PROMPT
+  },
+  SIMULATION_TURN: {
+    title: 'シミュレーション継続プロンプト',
+    description: 'シミュレーション中の追随質問を生成するためのシステムプロンプトです。',
+    defaultValue: SIMULATION_TURN_PROMPT
+  },
+  RISK_ANALYSIS: {
+    title: 'リスク分析プロンプト',
+    description: '質問と回答から想定リスクを分析するためのシステムプロンプトです。',
+    defaultValue: RISK_SYSTEM_PROMPT
   }
 } as const;
 

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { Risk } from '@/lib/schemas';
 
 export interface ChatMessage {
   id: string;
@@ -13,14 +14,24 @@ interface ChatState {
   messages: ChatMessage[];
   isLoading: boolean;
   
+  // リスク分析データ
+  risks: Risk[];
+  isAnalyzingRisk: boolean;
+  
   // アクション
   initializeChat: (topic: string) => void;
   addMessage: (role: 'reporter' | 'user', text: string) => void;
   setLoading: (loading: boolean) => void;
   clearChat: () => void;
   
+  // リスク分析アクション
+  setRisks: (risks: Risk[]) => void;
+  setAnalyzingRisk: (analyzing: boolean) => void;
+  clearRisks: () => void;
+  
   // ゲッター
   getLastReporterQuestion: () => string | null;
+  getLastUserAnswer: () => string | null;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -28,13 +39,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
   topic: '',
   messages: [],
   isLoading: false,
+  
+  // リスク分析初期状態
+  risks: [],
+  isAnalyzingRisk: false,
 
   // チャット初期化
   initializeChat: (topic: string) => {
     set({
       topic,
       messages: [],
-      isLoading: false
+      isLoading: false,
+      risks: [],
+      isAnalyzingRisk: false
     });
   },
 
@@ -62,8 +79,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({
       topic: '',
       messages: [],
-      isLoading: false
+      isLoading: false,
+      risks: [],
+      isAnalyzingRisk: false
     });
+  },
+
+  // リスク分析アクション
+  setRisks: (risks: Risk[]) => {
+    set({ risks });
+  },
+
+  setAnalyzingRisk: (analyzing: boolean) => {
+    set({ isAnalyzingRisk: analyzing });
+  },
+
+  clearRisks: () => {
+    set({ risks: [] });
   },
 
   // 最後の記者質問を取得
@@ -72,6 +104,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const reporterMessages = state.messages.filter(msg => msg.role === 'reporter');
     return reporterMessages.length > 0 
       ? reporterMessages[reporterMessages.length - 1].text 
+      : null;
+  },
+
+  // 最後のユーザー回答を取得
+  getLastUserAnswer: () => {
+    const state = get();
+    const userMessages = state.messages.filter(msg => msg.role === 'user');
+    return userMessages.length > 0 
+      ? userMessages[userMessages.length - 1].text 
       : null;
   }
 }));
@@ -83,7 +124,11 @@ export const useChatActions = () => {
     addMessage,
     setLoading,
     clearChat,
-    getLastReporterQuestion
+    setRisks,
+    setAnalyzingRisk,
+    clearRisks,
+    getLastReporterQuestion,
+    getLastUserAnswer
   } = useChatStore();
   
   return {
@@ -91,17 +136,24 @@ export const useChatActions = () => {
     addMessage,
     setLoading,
     clearChat,
-    getLastReporterQuestion
+    setRisks,
+    setAnalyzingRisk,
+    clearRisks,
+    getLastReporterQuestion,
+    getLastUserAnswer
   };
 };
 
 export const useChatData = () => {
-  const { topic, messages, isLoading } = useChatStore();
+  const { topic, messages, isLoading, risks, isAnalyzingRisk } = useChatStore();
   
   return {
     topic,
     messages,
     isLoading,
-    hasMessages: messages.length > 0
+    risks,
+    isAnalyzingRisk,
+    hasMessages: messages.length > 0,
+    hasRisks: risks.length > 0
   };
 };

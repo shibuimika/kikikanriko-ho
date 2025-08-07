@@ -81,3 +81,38 @@ export interface SimulationStartResponse {
 export interface SimulationTurnResponse {
   next_question: string;
 }
+
+// リスク分析用のSchema
+export const RiskAnalysisSchema = {
+  type: "object",
+  properties: {
+    risks: {
+      type: "array",
+      minItems: 1,
+      items: {
+        type: "object",
+        required: ["id", "description", "severity"],
+        properties: {
+          id: { type: "string" },
+          description: { type: "string", minLength: 5 },
+          severity: { 
+            type: "string", 
+            enum: ["high", "medium", "low"] 
+          }
+        }
+      }
+    }
+  },
+  required: ["risks"]
+} as const;
+
+// リスク分析用の型定義
+export interface Risk {
+  id: string;
+  description: string;
+  severity: 'high' | 'medium' | 'low';
+}
+
+export interface RiskAnalysisResponse {
+  risks: Risk[];
+}

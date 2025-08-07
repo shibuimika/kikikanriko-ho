@@ -53,6 +53,11 @@ export async function callQwen3(options: LLMCallOptions): Promise<LLMResponse> {
     const promptTokens = response.usage?.prompt_tokens || 0;
     const completionTokens = response.usage?.completion_tokens || 0;
 
+    // Check for empty or invalid response
+    if (!content || content.trim().length === 0) {
+      throw new Error('LLM returned empty response');
+    }
+
     logger.apiCall(
       'llm-call',
       requestId,
@@ -90,73 +95,117 @@ function generateRequestId(): string {
 }
 
 export function extractJSON(text: string): string {
-  // Remove thinking tags and other common prefixes
+  if (!text || text.trim().length === 0) {
+    throw new Error('Empty response from LLM');
+  }
+
   let cleaned = text.trim();
   
-  // Remove <think>...</think> blocks
-  cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  // Log for debugging (only in development)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Original text length:', text.length);
+    console.log('Text preview:', text.substring(0, 200));
+  }
   
-  // Remove other common tags
+  // Pre-processing: if text starts with <think> but no valid JSON follows, try to extract JSON
+  if (cleaned.startsWith('<think') && !cleaned.includes('</think>')) {
+    // Find the first { after any <think> tag
+    const jsonStart = cleaned.search(/\{/);
+    if (jsonStart > 0) {
+      cleaned = cleaned.substring(jsonStart);
+    }
+  }
+  
+  // Step 1: Very aggressive removal of thinking blocks
+  // First, handle closed thinking blocks
+  cleaned = cleaned.replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, '');
+  cleaned = cleaned.replace(/<thinking\b[^>]*>[\s\S]*?<\/thinking>/gi, '');
+  cleaned = cleaned.replace(/<reason\b[^>]*>[\s\S]*?<\/reason>/gi, '');
+  cleaned = cleaned.replace(/<reasoning\b[^>]*>[\s\S]*?<\/reasoning>/gi, '');
+  
+  // Then, remove everything starting from any unclosed opening tag
+  cleaned = cleaned.replace(/<think\b[^>]*>[\s\S]*/gi, '');
+  cleaned = cleaned.replace(/<thinking\b[^>]*>[\s\S]*/gi, '');
+  
+  // Special case: if text starts with <think>, remove everything up to the first {
+  if (cleaned.startsWith('<think')) {
+    const firstBrace = cleaned.indexOf('{');
+    if (firstBrace > 0) {
+      cleaned = cleaned.substring(firstBrace);
+    }
+  }
+  
+  // Step 2: Remove all remaining HTML/XML tags
   cleaned = cleaned.replace(/<[^>]*>/g, '');
   
-  // Remove markdown code blocks
-  cleaned = cleaned.replace(/```json\s*/gi, '');
+  // Step 3: Remove markdown code blocks
   cleaned = cleaned.replace(/```[\s\S]*?```/g, '');
-  cleaned = cleaned.replace(/```[^`]*```/g, '');
-  cleaned = cleaned.replace(/```/g, '');
   
-  // Remove common prefixes
-  cleaned = cleaned.replace(/^(?:出力：?|回答：?|レスポンス：?|応答：?|結果：?|JSON：?)\s*/gi, '');
+  // Step 4: Clean up whitespace and newlines
+  cleaned = cleaned.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
   
-  // Find JSON object boundaries more precisely
+  // Step 5: Extract JSON using multiple strategies
+  let jsonResult = '';
+  
+  // Strategy 1: Try to find a properly balanced JSON object
+  let foundJson = false;
+  let braceCount = 0;
   let startIndex = -1;
   let endIndex = -1;
-  let braceCount = 0;
   
   for (let i = 0; i < cleaned.length; i++) {
     if (cleaned[i] === '{') {
-      if (startIndex === -1) startIndex = i;
+      if (braceCount === 0) {
+        startIndex = i;
+      }
       braceCount++;
     } else if (cleaned[i] === '}') {
       braceCount--;
-      if (braceCount === 0 && startIndex !== -1) {
+      if (braceCount === 0 && startIndex >= 0) {
         endIndex = i;
+        foundJson = true;
         break;
       }
     }
   }
   
-  if (startIndex !== -1 && endIndex !== -1) {
-    cleaned = cleaned.substring(startIndex, endIndex + 1);
+  if (foundJson && startIndex >= 0 && endIndex > startIndex) {
+    jsonResult = cleaned.substring(startIndex, endIndex + 1);
   } else {
-    // Fallback to original logic
+    // Fallback: simple brace matching
     const firstBrace = cleaned.indexOf('{');
-    if (firstBrace > 0) {
-      cleaned = cleaned.substring(firstBrace);
-    }
-    
     const lastBrace = cleaned.lastIndexOf('}');
-    if (lastBrace >= 0 && lastBrace < cleaned.length - 1) {
-      cleaned = cleaned.substring(0, lastBrace + 1);
+    
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      jsonResult = cleaned.substring(firstBrace, lastBrace + 1);
+    } else {
+      throw new Error('No JSON object found in response');
     }
   }
   
-  return cleaned.trim();
+  // Step 6: Validate that we have a reasonable JSON structure
+  if (!jsonResult.includes(':') || !jsonResult.includes('"')) {
+    throw new Error('Invalid JSON structure detected');
+  }
+  
+  // Step 7: Final cleanup
+  jsonResult = jsonResult.trim();
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Extracted JSON:', jsonResult.substring(0, 200));
+  }
+  
+  return jsonResult;
 }
 
 // Legacy prompts (will be replaced by prompts.ts)
-import { 
-  DEFAULT_QUESTIONS_PROMPT, 
-  DEFAULT_FOLLOWUP_PROMPT,
-  DEFAULT_SIMULATION_START_PROMPT,
-  DEFAULT_SIMULATION_TURN_PROMPT
-} from './prompts';
+import { DEFAULT_QUESTIONS_PROMPT, DEFAULT_FOLLOWUP_PROMPT, SIMULATION_START_PROMPT, SIMULATION_TURN_PROMPT } from './prompts';
 
 export const SYSTEM_PROMPTS = {
   QUESTIONS_GENERATION: DEFAULT_QUESTIONS_PROMPT,
   FOLLOWUP_GENERATION: DEFAULT_FOLLOWUP_PROMPT,
-  SIMULATION_START: DEFAULT_SIMULATION_START_PROMPT,
-  SIMULATION_TURN: DEFAULT_SIMULATION_TURN_PROMPT
+  SIMULATION_START: SIMULATION_START_PROMPT,
+  SIMULATION_TURN: SIMULATION_TURN_PROMPT
 };
 
 export function createQuestionsPrompt(topic: string, context?: string): string {
@@ -177,15 +226,15 @@ export function createFollowUpPrompt(
 【論点メモ（任意）】: ${threadNotes || 'なし'}`;
 }
 
-// シミュレーション用プロンプト作成関数
 export function createSimulationStartPrompt(topic: string): string {
-  return `【テーマ】: ${topic}`;
+  return `【テーマ】: ${topic}
+
+上記のテーマについて、記者会見での最初の質問を生成してください。`;
 }
 
-export function createSimulationTurnPrompt(
-  lastQuestion: string,
-  userAnswer: string
-): string {
-  return `【前の質問】: ${lastQuestion}
-【広報回答】: ${userAnswer}`;
+export function createSimulationTurnPrompt(lastQuestion: string, userAnswer: string): string {
+  return `【前回の質問】: ${lastQuestion}
+【広報回答】: ${userAnswer}
+
+上記の質問と回答を踏まえて、次の追随質問を生成してください。`;
 }

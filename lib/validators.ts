@@ -4,12 +4,12 @@ import {
   FollowUpSchema, 
   SimulationStartSchema,
   SimulationTurnSchema,
+  RiskAnalysisSchema,
   QuestionsResponse, 
-  FollowUpResponse,
-  SimulationStartResponse,
-  SimulationTurnResponse
+  FollowUpResponse 
 } from './schemas';
 import { logger } from './logging';
+import { extractJSON } from './llm';
 
 const ajv = new Ajv();
 
@@ -18,6 +18,7 @@ const validateQuestions = ajv.compile(QuestionsSchema);
 const validateFollowUp = ajv.compile(FollowUpSchema);
 const validateSimulationStart = ajv.compile(SimulationStartSchema);
 const validateSimulationTurn = ajv.compile(SimulationTurnSchema);
+const validateRiskAnalysis = ajv.compile(RiskAnalysisSchema);
 
 export async function validateOrRetry<T>(
   schema: any,
@@ -33,34 +34,21 @@ export async function validateOrRetry<T>(
         response_preview: text.substring(0, 200) + (text.length > 200 ? '...' : '')
       });
       
-      const parsed = JSON.parse(text);
+      // Extract JSON from potentially malformed response
+      const cleanedText = extractJSON(text);
+      const parsed = JSON.parse(cleanedText);
       
-      // Determine which validator to use
-      let isValid = false;
-      let errors: any = null;
-      
-      if (schema === QuestionsSchema) {
-        isValid = validateQuestions(parsed);
-        errors = validateQuestions.errors;
-      } else if (schema === FollowUpSchema) {
-        isValid = validateFollowUp(parsed);
-        errors = validateFollowUp.errors;
-      } else if (schema === SimulationStartSchema) {
-        isValid = validateSimulationStart(parsed);
-        errors = validateSimulationStart.errors;
-      } else if (schema === SimulationTurnSchema) {
-        isValid = validateSimulationTurn(parsed);
-        errors = validateSimulationTurn.errors;
-      }
+      // Create a validator for this schema if we don't have a pre-compiled one
+      const validator = ajv.compile(schema);
+      const isValid = validator(parsed);
+      const errors = validator.errors;
       
       if (isValid) {
         logger.info(`Validation successful on attempt ${attempt + 1}`);
         return parsed as T;
       } else {
-        logger.warn(`Validation failed on attempt ${attempt + 1}`, { 
-          errors,
-          parsed_data: JSON.stringify(parsed, null, 2)
-        });
+        
+        logger.warn(`Validation failed on attempt ${attempt + 1}`, { errors });
         
         if (attempt >= maxRetries) {
           throw new Error(`Validation failed after ${maxRetries + 1} attempts: ${JSON.stringify(errors)}`);
@@ -90,4 +78,10 @@ export async function validateOrRetry<T>(
   throw new Error(`Failed to validate after ${maxRetries + 1} attempts`);
 }
 
-export { validateQuestions, validateFollowUp, validateSimulationStart, validateSimulationTurn };
+export { 
+  validateQuestions, 
+  validateFollowUp, 
+  validateSimulationStart, 
+  validateSimulationTurn, 
+  validateRiskAnalysis 
+};
